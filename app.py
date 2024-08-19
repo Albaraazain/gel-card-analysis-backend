@@ -13,7 +13,7 @@ import base64
 
 app = Flask(__name__)
 # Update CORS configuration to allow all origins
-CORS(app, resources={r"/api/*": {"origins": ["https://gel-card-classifier-60152oeqg-albaraazains-projects.vercel.app"]}})
+CORS(app, resources={r"/api/*": {"origins": ["https://gel-card-classifier-60152oeqg-albaraazains-projects.vercel.app", "http://localhost:8081"]}})
 
 # Load the trained model, scaler, and label encoder
 model = joblib.load('trained_model.joblib')
