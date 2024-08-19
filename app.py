@@ -12,7 +12,8 @@ import io
 import base64
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:8080"}})
+# Update CORS configuration to allow all origins
+CORS(app)
 
 # Load the trained model, scaler, and label encoder
 model = joblib.load('trained_model.joblib')
@@ -24,6 +25,7 @@ with open('ReactionGradeDataset_version2.json', 'r') as f:
     dataset = json.load(f)
 
 IMAGE_FOLDER = 'Reaction_grades_dataset_new'
+
 
 def elbow_method(data, max_clusters=10):
     inertias = []
@@ -92,38 +94,6 @@ def pad_features(features, max_length):
     else:
         return features
 
-@app.route('/api/classify_image/<int:image_id>', methods=['GET'])
-def classify_image(image_id):
-    item = next((item for item in dataset if item['id'] == image_id), None)
-    if item is None:
-        return jsonify({'error': 'Image not found'}), 404
-
-    image_path = os.path.join(IMAGE_FOLDER, os.path.basename(item['data']['image']))
-    image = cv2.imread(image_path)
-    if image is None:
-        return jsonify({'error': 'Failed to read image'}), 500
-
-    image = cv2.resize(image, (224, 224))
-    features, _ = extract_gel_card_features_dynamic(image)
-    max_length = model.n_features_in_
-    padded_features = pad_features(features, max_length)
-
-    # Add this line for debugging
-    print(f"Padded features shape: {padded_features.shape}")
-
-    scaled_features = scaler.transform(padded_features.reshape(1, -1))
-
-    prediction = model.predict(scaled_features)
-    probabilities = model.predict_proba(scaled_features)
-
-    predicted_class = label_encoder.inverse_transform(prediction)[0]
-    confidence = float(np.max(probabilities) * 100)  # Convert to float for JSON serialization
-
-    return jsonify({
-        'predicted_class': predicted_class,
-        'confidence': confidence
-    })
-
 def generate_processing_stages(image):
     original_height, original_width = image.shape[:2]
     aspect_ratio = original_width / original_height
@@ -176,14 +146,34 @@ def generate_processing_stages(image):
 def get_data():
     return jsonify(dataset)
 
-def process_numpy(obj):
-    if isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    return obj
+@app.route('/api/classify_image/<int:image_id>', methods=['GET'])
+def classify_image(image_id):
+    item = next((item for item in dataset if item['id'] == image_id), None)
+    if item is None:
+        return jsonify({'error': 'Image not found'}), 404
+
+    image_path = os.path.join(IMAGE_FOLDER, os.path.basename(item['data']['image']))
+    image = cv2.imread(image_path)
+    if image is None:
+        return jsonify({'error': 'Failed to read image'}), 500
+
+    image = cv2.resize(image, (224, 224))
+    features, _ = extract_gel_card_features_dynamic(image)
+    max_length = model.n_features_in_
+    padded_features = pad_features(features, max_length)
+
+    scaled_features = scaler.transform(padded_features.reshape(1, -1))
+
+    prediction = model.predict(scaled_features)
+    probabilities = model.predict_proba(scaled_features)
+
+    predicted_class = label_encoder.inverse_transform(prediction)[0]
+    confidence = float(np.max(probabilities) * 100)
+
+    return jsonify({
+        'predicted_class': predicted_class,
+        'confidence': confidence
+    })
 
 @app.route('/api/process_image/<int:image_id>', methods=['GET'])
 def process_image(image_id):
@@ -206,9 +196,9 @@ def process_image(image_id):
     feature_descriptions = [f"Feature {i+1}" for i in range(len(padded_features))]
 
     response_data = {
-        'feature_vector': process_numpy(padded_features),
+        'feature_vector': padded_features.tolist(),  # Convert numpy array to list
         'feature_descriptions': feature_descriptions,
-        'n_clusters': process_numpy(n_clusters)
+        'n_clusters': int(n_clusters)  # Ensure this is JSON serializable
     }
 
     return jsonify(response_data)
@@ -272,4 +262,4 @@ def get_dataset_stats():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
