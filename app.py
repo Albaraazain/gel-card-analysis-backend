@@ -141,6 +141,9 @@ def generate_processing_stages(image):
 
     return stages
 
+@app.route('/')
+def home():
+    return "Hello from the Gel Card Analysis Backend!"
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
