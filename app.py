@@ -13,7 +13,7 @@ import base64
 
 app = Flask(__name__)
 # Update CORS configuration to allow all origins
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:8081", "https://your-frontend-domain.com"]}})
 
 # Load the trained model, scaler, and label encoder
 model = joblib.load('trained_model.joblib')
